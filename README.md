@@ -256,3 +256,7 @@ with the imports rewritten to absolute paths. Pi injects its own copies at runti
 - Cost display (intentionally absent — local models always report `$0`).
 - Per-tool token counts (tools do not produce model tokens; their tokens show up in the
   next assistant call's `In`).
+
+> **Note on `tsconfig.json`:** it exists only for optional type-checking on the maintainer's machine
+> (its `paths` entries point at the maintainer's global pi install). It is never used at runtime and
+> does not affect loading, running, or installing this extension on another computer.
