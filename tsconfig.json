@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2023"
+    ],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "types": [
+      "node"
+    ],
+    "noEmit": true,
+    "typeRoots": [
+      "C:/Users/serge/AppData/Roaming/npm/node_modules/@earendil-works/pi-coding-agent/node_modules/@types"
+    ],
+    "paths": {
+      "@earendil-works/pi-coding-agent": [
+        "C:/Users/serge/AppData/Roaming/npm/node_modules/@earendil-works/pi-coding-agent/dist/index.d.ts"
+      ],
+      "@earendil-works/pi-coding-agent/*": [
+        "C:/Users/serge/AppData/Roaming/npm/node_modules/@earendil-works/pi-coding-agent/dist/*"
+      ],
+      "@earendil-works/pi-tui": [
+        "C:/Users/serge/AppData/Roaming/npm/node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-tui/dist/index.d.ts"
+      ],
+      "@earendil-works/pi-tui/*": [
+        "C:/Users/serge/AppData/Roaming/npm/node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-tui/dist/*"
+      ]
+    }
+  },
+  "include": [
+    "index.ts"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "name": "pi-stamp-plus",
+  "version": "0.7.0",
+  "description": "Left-aligned one-line stamps in the Pi transcript, written after the entry they describe: clock, duration, tokens, Ctx, PP/TG estimate, tool name and result.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "timestamp",
+    "tokens"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sbsamarski/pi-stamp-plus.git"
+  }
+}
