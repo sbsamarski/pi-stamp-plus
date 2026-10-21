@@ -65,7 +65,12 @@ Other cases:
   line are averaged over the whole compaction (the summary request is not streamed to
   extensions, so there is no first-token time to split prefill from generation).
   Turn `showCompaction` off to drop the line. A compaction that failed ends with
-  `ERROR: <reason>`, a cancelled one with `ABORTED`.
+  `ERROR: <reason>`, a cancelled one with `ABORTED`. A compaction that [pi-compact-plus](../pi-compact-plus)
+  held back on purpose - pi's threshold rang early and the summary is not due yet - writes no line at
+  all: pi reports that cancel the same way it reports a real abort, so pi-compact-plus leaves a one-use
+  note next to the session file (`<session>.jsonl.pcp-held.json`) and this extension honours only that
+  note, deleting it on use. A compaction that really is aborted is still stamped `ABORTED`, even one
+  second after a held one.
 - **tool result** — by default attached to the end of the stamp line of the answer that
   follows the tool output (`… · bash · OK` or `… · bash · ERROR: <first characters of the error>`); a batch reads
   `edit, bash · OK` (`+N` when more than three tools ran). ANSI colours and newlines in the

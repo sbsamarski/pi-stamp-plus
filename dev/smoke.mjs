@@ -7,7 +7,7 @@
 // because Pi renders/persists an entry only after the extension handler returns. Scenarios
 // therefore end with agent_end (as a real turn does) to flush the last stamp.
 import { pathToFileURL } from "node:url";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -276,6 +276,37 @@ await show("compaction cancelled", [
 	["session_compact_failed", { reason: "manual", errorMessage: "Compaction cancelled", aborted: true, willRetry: false, fromExtension: false }],
 ]);
 assert("a cancelled compaction is marked ABORTED", renderAll(200)[0].includes("ABORTED"));
+
+// A HELD COMPACTION IS NOT AN ABORTED ONE (2026-10-21). pi-compact-plus lets pi's threshold ring
+// early and cancels it until its own trigger point; pi reports that cancel the same way it reports
+// an Escape key, so pi-compact-plus leaves a one-use note next to the session file. Only that note
+// silences the line - a genuine abort, one second later, still has to appear.
+const heldSession = join(tmpdir(), `pi-stamp-hold-${process.pid}.jsonl`);
+writeFileSync(heldSession, "");
+process.env.PI_SESSION_FILE = heldSession;
+await reset();
+writeFileSync(`${heldSession}.pcp-held.json`, JSON.stringify({ at: Date.now(), by: "pi-compact-plus", why: "not time yet" }));
+await show("compaction held by pi-compact-plus", [
+	["session_before_compact", { preparation: { tokensBefore: 120178 }, branchEntries: [], reason: "threshold", willRetry: false }],
+	["session_compact_failed", { reason: "threshold", errorMessage: "Compaction cancelled", aborted: true, willRetry: false, fromExtension: false }],
+]);
+assert("a held compaction writes no line at all", entries.length === 0);
+assert("the note is used up, so it cannot silence anything else", !existsSync(`${heldSession}.pcp-held.json`));
+await show("the next compaction really is aborted", [
+	["session_before_compact", { preparation: { tokensBefore: 150000 }, branchEntries: [], reason: "threshold", willRetry: false }],
+	["session_compact_failed", { reason: "threshold", errorMessage: "Compaction cancelled", aborted: true, willRetry: false, fromExtension: false }],
+]);
+assert("an abort with no note is still marked ABORTED", renderAll(200)[0].includes("ABORTED"));
+// A note left over from a compaction that started EARLIER (a stale one) must not silence a later abort.
+writeFileSync(`${heldSession}.pcp-held.json`, JSON.stringify({ at: Date.now() - 120_000 }));
+await show("a stale note is ignored", [
+	["session_before_compact", { preparation: { tokensBefore: 150000 }, branchEntries: [], reason: "threshold", willRetry: false }],
+	["session_compact_failed", { reason: "threshold", errorMessage: "Compaction cancelled", aborted: true, willRetry: false, fromExtension: false }],
+]);
+assert("a stale note does not silence a real abort", renderAll(200)[0].includes("ABORTED"));
+rmSync(`${heldSession}.pcp-held.json`, { force: true });
+rmSync(heldSession, { force: true });
+delete process.env.PI_SESSION_FILE;
 
 await reset({ showCompaction: false });
 await show("showCompaction off", [

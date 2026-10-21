@@ -34,7 +34,7 @@
  * belongs to the host and cannot be removed from an extension.
  */
 
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -1063,6 +1063,39 @@ export default function stampLiteExtension(pi: ExtensionAPI): void {
 
 	// A compaction summarises the session with its own LLM call that never appears as a
 	// normal assistant message, so it gets a line of its own. The numbers are the real usage
+/**
+ * True when pi-compact-plus cancelled THIS compaction because it is not time yet (2026-10-21).
+ *
+ * pi answers its own threshold early here: pi-compact-plus holds the compaction until its own
+ * trigger point, and pi reports that hold exactly like an aborted one - `session_compact_failed`
+ * with `aborted: true` and no error message - so from this event alone a hold and a real Escape-key
+ * abort are indistinguishable, and stamping both as ABORTED makes routine work look like a fault.
+ * pi-compact-plus writes a one-use note next to the session file at the moment it cancels. A note is
+ * honoured only when it belongs to the compaction being stamped (written at or after that compaction
+ * started) and is still fresh, and it is deleted on use - so a genuine abort straight after a hold is
+ * still stamped, and an old note can never silence anything.
+ */
+function holdNoteConsumed(startedAt: number | undefined): boolean {
+	const sf = String(process.env.PI_SESSION_FILE ?? "").trim();
+	if (!sf) return false;
+	const p = `${sf}.pcp-held.json`;
+	let at = 0;
+	try {
+		at = Number(JSON.parse(readFileSync(p, "utf8"))?.at ?? 0);
+	} catch {
+		return false; // no note, or an unreadable one: stamp as usual
+	}
+	if (!(at > 0)) return false;
+	const fresh = Date.now() - at <= 10_000;
+	const mine = startedAt === undefined || at >= startedAt - 500;
+	if (!fresh || !mine) return false;
+	try {
+		rmSync(p, { force: true });
+	} catch {
+		/* A note that cannot be deleted expires on its own after ten seconds. */
+	}
+	return true;
+}
 	// the summary call reported, stored by Pi on the compaction entry.
 	pi.on("session_before_compact", (event) => {
 		flush();
@@ -1102,8 +1135,13 @@ export default function stampLiteExtension(pi: ExtensionAPI): void {
 	pi.on("session_compact_failed", (event) => {
 		const start = compactionStart;
 		compactionStart = undefined;
+		// A HELD COMPACTION IS NOT AN ABORTED ONE (2026-10-21). pi-compact-plus cancels pi's early
+		// trigger on purpose; only a note from that extension keeps this line off the screen, so a
+		// real abort - Escape during a summary, or a compaction that died - is still stamped.
+		const held = event.aborted && holdNoteConsumed(start?.t0);
 		if (!settings.showCompaction) return;
 		flush();
+		if (held) return;
 		const endAt = Date.now();
 		const t0 = start?.t0 ?? endAt;
 		const text = event.errorMessage === undefined ? "" : errorText(event.errorMessage);
