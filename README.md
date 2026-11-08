@@ -7,23 +7,23 @@ answer or a tool run is followed by its own line; a tool run adds no extra line 
 Every line is `date, clock · duration · In · Out · TG · PP · Ctx · tool · result`:
 
 ```
-Sun, 8 Nov, 20:31 · In 6 · Ctx 62,784
-Sun, 8 Nov, 20:32 · 28s · In 3,486 · Out 1,874 · TG 70.5 t/s · PP 1,981 t/s · Ctx 62,784
-Sun, 8 Nov, 20:32 · 36s · In 101 · Out 584 · TG 16.5 t/s · PP 240 t/s · Ctx 58,109
-Sun, 8 Nov, 20:32 · 4s · In 84 · Out 241 · TG 18.9 t/s · PP 210 t/s · Ctx 58,350 · edit, bash · ERROR: /bin/sh: 1: nosuchprog: not found
-Sun, 8 Nov, 23:10 · 48s · Compaction (auto) · In 63,667 · Out 15,500 · TG 321 t/s · PP 1,320 t/s · Ctx 100,318 → ~46,900 · OK
+08-Nov-2026, 20:31 · In 6 · Ctx 62,784
+08-Nov-2026, 20:32 · 28s · In 3,486 · Out 1,874 · TG 70.5 t/s · PP 1,981 t/s · Ctx 62,784
+08-Nov-2026, 20:32 · 36s · In 101 · Out 584 · TG 16.5 t/s · PP 240 t/s · Ctx 58,109
+08-Nov-2026, 20:32 · 4s · In 84 · Out 241 · TG 18.9 t/s · PP 210 t/s · Ctx 58,350 · edit, bash · ERROR: /bin/sh: 1: nosuchprog: not found
+08-Nov-2026, 23:10 · 48s · Compaction (auto) · In 63,667 · Out 15,500 · TG 321 t/s · PP 1,320 t/s · Ctx 100,318 → ~46,900 · OK
 ```
 
 The clock reads to the minute and the duration to the whole second. Seconds on every line of a
 transcript are noise, and the duration beside the clock already says how long the call took. The date
-appears on every line, not only when the day changed: a stamped session is often read the next day,
-and "when was this" is the first question then.
+(`08-Nov-2026`) appears on every line, not only when the day changed: a stamped session is often read
+the next day, and "when was this" is the first question then.
 
 ## Fields
 
 | Field | Meaning |
 |---|---|
-| `Sun, 8 Nov, 20:32` | the moment of the call (start or end, see `stampTime`); `showDate` off leaves the clock alone |
+| `08-Nov-2026, 20:32` | the moment of the call (start or end, see `stampTime`); `showDate` off leaves the clock alone |
 | `28s` | wall time of that LLM call (request start → stream end) |
 | `In 3,486` | new (non-cached) prompt tokens sent in that call |
 | `Out 1,874` | tokens generated in that call (includes reasoning) |

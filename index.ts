@@ -50,7 +50,10 @@ import {
 import { type Component, visibleWidth } from "@earendil-works/pi-tui";
 
 const ENTRY_TYPE = "pi-stamp-plus";
-const LEGACY_ENTRY_TYPE = "pi-stamp-plus";   // stamps already stored in old sessions
+// The name this extension wrote under before it was renamed. Old sessions hold
+// entries of this type, so it needs its own renderer registration - the new name
+// does not cover them.
+const LEGACY_ENTRY_TYPE = "pi-stamp-lite";
 const SETTINGS_FILE = "pi-stamp-plus.json";
 const STAMP_VERSION = 3;
 const MAX_ACTIVE_MESSAGES = 64;
@@ -388,12 +391,12 @@ function clock(ts: number, settings: StampLiteSettings): string {
 	return text;
 }
 
-/** "Sun, 8 Nov" - the weekday and date in front of the time. */
+/** "08-Nov-2026" - the date in front of the time. */
 function dateTag(ts: number): string {
 	const date = new Date(ts);
-	const day = date.toLocaleString("en-US", { weekday: "short" });
+	const day = String(date.getDate()).padStart(2, "0");
 	const month = date.toLocaleString("en-US", { month: "short" });
-	return `${day}, ${date.getDate()} ${month}`;
+	return `${day}-${month}-${date.getFullYear()}`;
 }
 
 function duration(ms: number): string {

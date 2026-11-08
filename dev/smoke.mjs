@@ -19,7 +19,10 @@ const PI_PKG = "C:/Users/serge/AppData/Roaming/npm/node_modules/@earendil-works/
 const here = join(process.argv[1], "..");
 
 process.env.PI_CODING_AGENT_DIR = mkdtempSync(join(tmpdir(), "stamp-lite-"));
-const settingsPath = join(process.env.PI_CODING_AGENT_DIR, "pi-stamp-lite.json");
+// The file the extension actually reads and writes (SETTINGS_FILE in index.ts).
+// This said pi-stamp-lite.json, from before the rename, so every test that
+// toggled a setting was writing where nothing would ever read it.
+const settingsPath = join(process.env.PI_CODING_AGENT_DIR, "pi-stamp-plus.json");
 
 const staged = join(here, "index.staged.ts");
 writeFileSync(
@@ -39,7 +42,9 @@ const handlers = [];
 const entries = [];
 const notices = [];
 let commandHandler = null;
-let renderer = null;
+// One renderer per entry type, as pi keeps them - the extension registers the
+// current type and the pre-rename legacy type.
+const renderers = new Map();
 let usageTokens = 62784;
 
 /** Answers queued for the interactive select()/input() prompts. */
@@ -50,7 +55,7 @@ const pi = {
 		handlers.push({ name, fn });
 	},
 	registerEntryRenderer(type, fn) {
-		renderer = [type, fn];
+		renderers.set(type, fn);
 	},
 	registerCommand(name, def) {
 		commandHandler = def.handler;
@@ -149,8 +154,9 @@ const END = ["agent_end", {}];
 
 const renderAll = (width) =>
 	entries.map(({ type, data }) => {
-		if (type !== renderer[0]) return "<other entry>";
-		const c = renderer[1]({ type: "custom", customType: type, data }, { expanded: false }, {
+		const fn = renderers.get(type);
+		if (!fn) return "<other entry>";
+		const c = fn({ type: "custom", customType: type, data }, { expanded: false }, {
 			fg: (color, text) => `[${color}]${text}[/]`,
 		});
 		return c === undefined ? "<hidden>" : c.render(width).join("⏎");
