@@ -3,11 +3,11 @@
  *
  * One line per transcript entry, left aligned, in one theme colour, written AFTER the
  * entry it describes, in this order:
- *   time · duration · In · Out · Cache · TG · PP · Ctx · tool · result
+ *   date, time · duration · In · Out · TG · PP · Ctx · tool · result
  *
- *   00:31:36 · In 300 · Ctx 62,784                                        (your message)
- *   00:32:04 · 35.7s · In 101 · Out 584 · Cache 57,424 · TG 16.9 t/s · PP 82 t/s · Ctx 58,109
- *   00:32:41 · 0.4s · In 84 · Out 241 · Ctx 58,350 · bash · OK           (answer after a tool)
+ *   Sun, 8 Nov, 20:31 · In 300 · Ctx 62,784                                (your message)
+ *   Sun, 8 Nov, 20:37 · 36s · In 101 · Out 584 · TG 28.8 t/s · PP 126 t/s · Ctx 58,109
+ *   Sun, 8 Nov, 20:38 · 1s · In 84 · Out 241 · Ctx 58,350 · bash · OK     (answer after a tool)
  *
  * Thinking, text and tool calls are blocks of ONE assistant message, so one stamp covers
  * them all and it lands directly below that message — before the output of the tool it
@@ -88,7 +88,7 @@ interface StampLiteSettings {
 	hourCycle: "24h" | "12h";
 	/** Which moment the clock shows for assistant and tool lines. */
 	stampTime: "start" | "end";
-	showSeconds: boolean;
+	/** Show the weekday and date before the time ("Sun, 8 Nov, 20:37"). */
 	showDate: boolean;
 	userLine: boolean;
 	/** `attach` = tool name and outcome on the next stamp line, `own` = its own line, `off` = nothing. */
@@ -101,7 +101,6 @@ interface StampLiteSettings {
 	showTokensIn: boolean;
 	showTokensOut: boolean;
 	showReasoning: boolean;
-	showCache: boolean;
 	/** Show the context size of that call (prompt including cache + generated). */
 	showContext: boolean;
 	/** Colour of the whole stamp line. */
@@ -113,7 +112,6 @@ interface StampLiteSettings {
 const DEFAULTS: StampLiteSettings = {
 	hourCycle: "24h",
 	stampTime: "start",
-	showSeconds: true,
 	showDate: true,
 	userLine: true,
 	toolLine: "attach",
@@ -124,7 +122,6 @@ const DEFAULTS: StampLiteSettings = {
 	showTokensIn: true,
 	showTokensOut: true,
 	showReasoning: false,
-	showCache: true,
 	showContext: true,
 	stampColor: "warning",
 	errorTextChars: 50,
@@ -156,8 +153,7 @@ type EnumKey = keyof typeof ENUM_KEYS;
 const FIELD_LABELS: readonly (readonly [keyof StampLiteSettings, string])[] = [
 	["hourCycle", "clock"],
 	["stampTime", "stamp time"],
-	["showSeconds", "seconds"],
-	["showDate", "date tag"],
+	["showDate", "date"],
 	["userLine", "user line"],
 	["toolLine", "tool info"],
 	["showCompaction", "compaction line"],
@@ -167,7 +163,6 @@ const FIELD_LABELS: readonly (readonly [keyof StampLiteSettings, string])[] = [
 	["showTokensIn", "In tokens"],
 	["showTokensOut", "Out tokens"],
 	["showReasoning", "Think tokens"],
-	["showCache", "Cache tokens"],
 	["showContext", "Ctx tokens"],
 	["stampColor", "colour"],
 	["errorTextChars", "error text chars"],
@@ -183,7 +178,6 @@ ALIASES.errorchars = "errorTextChars";
 type BooleanKey = { [K in keyof StampLiteSettings]: StampLiteSettings[K] extends boolean ? K : never }[keyof StampLiteSettings];
 
 const BOOLEAN_KEYS: readonly BooleanKey[] = [
-	"showSeconds",
 	"showDate",
 	"userLine",
 	"showCompaction",
@@ -193,7 +187,6 @@ const BOOLEAN_KEYS: readonly BooleanKey[] = [
 	"showTokensIn",
 	"showTokensOut",
 	"showReasoning",
-	"showCache",
 	"showContext",
 ];
 
@@ -388,19 +381,23 @@ function clock(ts: number, settings: StampLiteSettings): string {
 	const h24 = date.getHours();
 	const hour = settings.hourCycle === "12h" ? ((h24 + 11) % 12) + 1 : h24;
 	const pad = (n: number) => String(n).padStart(2, "0");
+	// Minutes only. Seconds on every line of a transcript are noise: the duration
+	// item right next to it already says how long the call took.
 	let text = `${pad(hour)}:${pad(date.getMinutes())}`;
-	if (settings.showSeconds) text += `:${pad(date.getSeconds())}`;
 	if (settings.hourCycle === "12h") text += h24 < 12 ? " AM" : " PM";
 	return text;
 }
 
+/** "Sun, 8 Nov" - the weekday and date in front of the time. */
 function dateTag(ts: number): string {
 	const date = new Date(ts);
-	return `${date.toLocaleString("en-US", { month: "short" })} ${date.getDate()}`;
+	const day = date.toLocaleString("en-US", { weekday: "short" });
+	const month = date.toLocaleString("en-US", { month: "short" });
+	return `${day}, ${date.getDate()} ${month}`;
 }
 
 function duration(ms: number): string {
-	if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+	if (ms < 60_000) return `${Math.max(1, Math.round(ms / 1000))}s`;
 	const minutes = Math.floor(ms / 60_000);
 	if (minutes < 60) {
 		const seconds = Math.round((ms % 60_000) / 1000);
@@ -557,14 +554,12 @@ function ctxTokensOf(data: StampLiteData): number {
 		: usage.input + usage.output + usage.cacheRead + (usage.cacheWrite ?? 0);
 }
 
-/** Clock, plus a date tag when the previous stamp was on another day. */
+/** The leading moment: "Sun, 8 Nov, 20:37" (or the clock alone with date off). */
 function stampText(data: StampLiteData, settings: StampLiteSettings): string {
 	const stamp = clock(data.ts, settings);
-	const showDate =
-		settings.showDate &&
-		data.prevTs !== undefined &&
-		new Date(data.prevTs).toDateString() !== new Date(data.ts).toDateString();
-	return showDate ? `${dateTag(data.ts)} ${stamp}` : stamp;
+	if (!settings.showDate) return stamp;
+	const day = dateTag(data.ts);
+	return day.length > 0 ? `${day}, ${stamp}` : stamp;
 }
 
 function buildParts(data: StampLiteData, settings: StampLiteSettings): Part[] {
@@ -576,7 +571,7 @@ function buildParts(data: StampLiteData, settings: StampLiteSettings): Part[] {
 	const isTool = data.kind === "tool";
 
 	if (data.kind === "compaction") {
-		// time · duration · Compaction · In · Out · Cache · TG · PP · Ctx before → after · result
+		// date, time · duration · Compaction · In · Out · TG · PP · Ctx before → after · result
 		const cu = data.usage;
 		if (settings.showDuration && data.durMs !== undefined && data.durMs >= 0) {
 			parts.push({ text: duration(data.durMs), prio: 93 });
@@ -585,7 +580,6 @@ function buildParts(data: StampLiteData, settings: StampLiteSettings): Part[] {
 		if (cu?.input && settings.showTokensIn) parts.push({ text: `In ${int(cu.input)}`, prio: 62 });
 		if (cu?.output && settings.showTokensOut) parts.push({ text: `Out ${int(cu.output)}`, prio: 66 });
 		if (cu?.reasoning && settings.showReasoning) parts.push({ text: `Think ${int(cu.reasoning)}`, prio: 45 });
-		if (cu?.cacheRead && settings.showCache) parts.push({ text: `Cache ${int(cu.cacheRead)}`, prio: 30 });
 		// The summary request is not streamed to extensions, so there is no first-token time:
 		// both rates are averaged over the whole compaction instead of split into prefill and
 		// generation as they are on an assistant line.
@@ -618,7 +612,7 @@ function buildParts(data: StampLiteData, settings: StampLiteSettings): Part[] {
 	const endAt = data.endAt ?? data.ts;
 	const usage = data.usage;
 
-	// time · duration · In · Out · Think · Cache · TG · PP · Ctx · tool · result
+	// date, time · duration · In · Out · Think · TG · PP · Ctx · tool · result
 	const durMs = settings.showDuration
 		? isTool ? data.durMs : (endAt >= t0 ? endAt - t0 : undefined)
 		: undefined;
@@ -628,7 +622,6 @@ function buildParts(data: StampLiteData, settings: StampLiteSettings): Part[] {
 		if (usage?.input && settings.showTokensIn) parts.push({ text: `In ${int(usage.input)}`, prio: 62 });
 		if (usage?.output && settings.showTokensOut) parts.push({ text: `Out ${int(usage.output)}`, prio: 66 });
 		if (usage?.reasoning && settings.showReasoning) parts.push({ text: `Think ${int(usage.reasoning)}`, prio: 45 });
-		if (usage?.cacheRead && settings.showCache) parts.push({ text: `Cache ${int(usage.cacheRead)}`, prio: 30 });
 		if (usage && settings.showGenSpeed && data.firstAt !== undefined) {
 			const text = rate("TG", usage.output, endAt - data.firstAt);
 			if (text) parts.push({ text, prio: 40 });

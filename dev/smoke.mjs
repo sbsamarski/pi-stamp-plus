@@ -341,10 +341,10 @@ assert("narrow lines stay on one row", renderAll(60).every((l) => !l.includes("â
 await reset();
 await commandHandler("status", ctx);
 console.log(`\n/status -> ${notices.at(-1)}`);
-await commandHandler("showCache off", ctx);
-console.log(`/showCache off -> ${notices.at(-1)}`);
-assert("the command writes the config", JSON.parse(readFileSync(settingsPath, "utf8")).showCache === false);
-await commandHandler("showCache on", ctx);
+await commandHandler("showDuration off", ctx);
+console.log(`/showDuration off -> ${notices.at(-1)}`);
+assert("the command writes the config", JSON.parse(readFileSync(settingsPath, "utf8")).showDuration === false);
+await commandHandler("showDuration on", ctx);
 
 // The interactive menu needs TUI mode.
 ctx.mode = "tui";

@@ -4,26 +4,30 @@ Left-aligned, one-line-per-entry stamps in the Pi chat transcript, in yellow. No
 no thinking level, no estimated cost. Each stamp lands **under the entry it describes**, so an
 answer or a tool run is followed by its own line; a tool run adds no extra line of its own.
 
-Every line is `clock · duration · In · Out · Cache · TG · PP · Ctx · tool · result`:
+Every line is `date, clock · duration · In · Out · TG · PP · Ctx · tool · result`:
 
 ```
-22:52:04 · In 6 · Ctx 62,784
-22:52:05 · 28.4s · In 3,486 · Out 1,874 · Cache 57,424 · TG 70.5 t/s · PP 1,981 t/s · Ctx 62,784
-22:52:33 · 35.7s · In 101 · Out 584 · Cache 57,424 · TG 16.5 t/s · PP 240 t/s · Ctx 58,109
-22:52:41 · 4.4s · In 84 · Out 241 · TG 18.9 t/s · PP 210 t/s · Ctx 58,350 · edit, bash · ERROR: /bin/sh: 1: nosuchprog: not found
-23:10:07 · 48.2s · Compaction (auto) · In 63,667 · Out 15,500 · TG 321 t/s · PP 1,320 t/s · Ctx 100,318 → ~46,900 · OK
+Sun, 8 Nov, 20:31 · In 6 · Ctx 62,784
+Sun, 8 Nov, 20:32 · 28s · In 3,486 · Out 1,874 · TG 70.5 t/s · PP 1,981 t/s · Ctx 62,784
+Sun, 8 Nov, 20:32 · 36s · In 101 · Out 584 · TG 16.5 t/s · PP 240 t/s · Ctx 58,109
+Sun, 8 Nov, 20:32 · 4s · In 84 · Out 241 · TG 18.9 t/s · PP 210 t/s · Ctx 58,350 · edit, bash · ERROR: /bin/sh: 1: nosuchprog: not found
+Sun, 8 Nov, 23:10 · 48s · Compaction (auto) · In 63,667 · Out 15,500 · TG 321 t/s · PP 1,320 t/s · Ctx 100,318 → ~46,900 · OK
 ```
+
+The clock reads to the minute and the duration to the whole second. Seconds on every line of a
+transcript are noise, and the duration beside the clock already says how long the call took. The date
+appears on every line, not only when the day changed: a stamped session is often read the next day,
+and "when was this" is the first question then.
 
 ## Fields
 
 | Field | Meaning |
 |---|---|
-| `22:52:05` | clock (start or end of the call, see `stampTime`) |
-| `28.4s` | wall time of that LLM call (request start → stream end) |
+| `Sun, 8 Nov, 20:32` | the moment of the call (start or end, see `stampTime`); `showDate` off leaves the clock alone |
+| `28s` | wall time of that LLM call (request start → stream end) |
 | `In 3,486` | new (non-cached) prompt tokens sent in that call |
 | `Out 1,874` | tokens generated in that call (includes reasoning) |
 | `Think 900` | reasoning tokens inside `Out` (hidden unless `showReasoning`) |
-| `Cache 62,108` | prompt tokens served from the prefix cache in that call |
 | `TG 70.5 t/s` | **estimate** of token-generation (decode) speed for that call |
 | `PP 1,981 t/s` | **estimate** of prompt-processing speed for that call |
 | `Ctx 62,784` | context size: prompt (including cached) + generated — roughly what sits in the KV cache |
@@ -129,7 +133,6 @@ one-line warning.
 {
   "hourCycle": "24h",
   "stampTime": "start",
-  "showSeconds": true,
   "showDate": true,
   "userLine": true,
   "toolLine": "attach",
@@ -140,7 +143,6 @@ one-line warning.
   "showTokensIn": true,
   "showTokensOut": true,
   "showReasoning": false,
-  "showCache": true,
   "showContext": true,
   "stampColor": "warning",
   "errorTextChars": 50
@@ -151,7 +153,6 @@ one-line warning.
 |---|---|---|
 | `hourCycle` | `"24h"` | `"24h"` or `"12h"` clock |
 | `stampTime` | `"start"` | clock shows the start or the end of assistant/tool work |
-| `showSeconds` | `true` | `HH:MM:SS` vs `HH:MM` |
 | `showDate` | `true` | add a `Sep 18` tag on the first entry of a new day |
 | `userLine` | `true` | stamp under your messages |
 | `toolLine` | `"attach"` | `"attach"` = tool name + outcome on the next stamp line, `"own"` = a line of its own directly under the tool's output (name, how long the tool ran, `OK`/`ERROR`), `"off"` = nothing. Old `true`/`false` still load, mapped to `own`/`off` with a warning |
@@ -162,7 +163,6 @@ one-line warning.
 | `showTokensIn` | `true` | `In …` |
 | `showTokensOut` | `true` | `Out …` |
 | `showReasoning` | `false` | `Think …` (reasoning tokens, a subset of `Out`) |
-| `showCache` | `true` | `Cache …` |
 | `showContext` | `true` | `Ctx …` (context / KV-cache size of that call) |
 | `stampColor` | `"warning"` | theme colour of the whole line: `warning` (yellow in the built-in themes), `accent`, `success`, `error`, `text`, `muted`, `dim`, `toolTitle`, `customMessageLabel` |
 | `errorTextChars` | `50` | characters of error text after `ERROR:` (`0` = label only, max 500) |
@@ -177,7 +177,7 @@ one-line warning.
 - **`/stamp-lite status`** prints the active fields and the config path (this is also what
   you get when `/stamp-lite` is used outside the interactive terminal).
 - **`/stamp-lite <field> [value]`** changes one setting directly, e.g.
-  `/stamp-lite showCache off`, `/stamp-lite toolLine own`, `/stamp-lite colour accent`,
+  `/stamp-lite showDate off`, `/stamp-lite toolLine own`, `/stamp-lite colour accent`,
   `/stamp-lite errorchars 30`. A boolean field with no value flips; an unknown field or value
   warns and changes nothing. Field names are the config keys (lower-case matches work, plus
   the aliases `colour`, `tools`, `errorchars`).
@@ -185,7 +185,7 @@ one-line warning.
 ### Narrow terminals
 
 The stamp is always one line. If it does not fit, fields drop in this order:
-`Cache`, `PP`, `TG`, `Think`, `Ctx`, `In`, `Out`. Clock, duration, tool name and the
+`PP`, `TG`, `Think`, `Ctx`, `In`, `Out`. Clock, duration, tool name and the
 result are kept; on a failing entry the renderer switches to
 `clock · [tool ·] ERROR: <as much text as fits>` so an error is never lost.
 
